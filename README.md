@@ -67,7 +67,7 @@ If you only need the command line without GUI run `make install-cli-only` as the
 
 ## Installation
 
-#### Debian/Ubuntu ( depricated - build yourself )
+#### Debian/Ubuntu ( deprecated - build yourself )
 
 Download the Debian package from the latest [release](https://github.com/lakinduakash/linux-wifi-hotspot/releases/latest)
 
@@ -80,7 +80,7 @@ sudo apt install linux-wifi-hotspot
 
 ```
 
-#### Arch based distributions ( depricated - build yourself )
+#### Arch based distributions ( deprecated - build yourself )
 
 Linux Wifi Hotspot is available as an [AUR package](https://aur.archlinux.org/packages/linux-wifi-hotspot/). You can install it manually or with your favorite AUR helper.
 For example, if you use `yay` you can do:
