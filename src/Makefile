@@ -1,8 +1,8 @@
 CC=gcc
 PKGCONFIG = $(shell which pkg-config)
 
-CFLAGS=`pkg-config --cflags gtk+-3.0`
-LIBS=`pkg-config --libs gtk+-3.0 --libs x11` -lstdc++ -lpng -lqrencode
+CFLAGS += `pkg-config --cflags gtk+-3.0`
+LDFLAGS += `pkg-config --libs gtk+-3.0 --libs x11` -lstdc++ -lpng -lqrencode
 
 APP_NAME="wihotspot"
 APP_GUI_BINARY="wihotspot-gui"
@@ -35,10 +35,10 @@ $(ODIR)/%.o: ui/%.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(ODIR)/%.o: ui/%.cpp
-	g++ -c -o $@ $<
+	g++ -c -o $@ $< $(CXXFLAGS)
 
 wihotspot-gui: $(OBJ)
-	$(CC) -o $(ODIR)/$@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $(ODIR)/$@ $^ $(CFLAGS) $(LDFLAGS)
 
 install: $(ODIR)/wihotspot-gui
 	install -Dm644 desktop/icons/hotspot@64.png $(DESTDIR)$(PREFIX)/share/pixmaps/wihotspot.png
