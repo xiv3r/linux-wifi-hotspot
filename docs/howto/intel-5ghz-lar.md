@@ -9,6 +9,16 @@ work out which one you are hitting before changing anything.
 | `Your adapter can not transmit to channel 36, frequency band 5GHz` | every 5GHz channel is flagged `no IR` | [disable LAR](#disabling-lar) |
 | `Failed to set beacon parameters` / `Interface initialization failed` | the AP must share the channel your WiFi client is on | nothing to do, `create_ap` now handles it |
 
+> **The fix here only covers `iwlmvm` adapters.** Check which Intel driver you
+> have before going further:
+>
+> ```
+> lsmod | grep -E '^iwl(dvm|mvm|mld)'
+> ```
+>
+> See [Scope and limitations](#scope-and-limitations) — the diagnosis applies
+> more widely than the fix does.
+
 ## Which one am I hitting?
 
 ```
@@ -194,7 +204,56 @@ automatically falls back to whatever the regulatory domain allows, reporting
 what it settled on. If your country's entry looks wrong, the fix belongs
 upstream in [wireless-regdb](https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git).
 
-## Non-Intel adapters
+## Scope and limitations
+
+`iwlwifi` hands your card to one of three operating-mode modules, and they set
+the regulatory flags differently. Only one of them is fixable this way.
+
+```
+lsmod | grep -E '^iwl(dvm|mvm|mld)'
+```
+
+### `iwlmvm` — supported
+
+Roughly 7260/3160/7265 and everything newer up to the AX2xx parts. It only marks
+the wiphy self-managed when LAR is available:
+
+```c
+if (iwl_mvm_is_lar_supported(mvm))
+        hw->wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
+```
+
+That test is what `lar_disable.patch` hooks into, so the scripts here work.
+
+### `iwlmld` — not supported yet
+
+The newest Wi-Fi 7 parts. `iwl_mld_hw_set_regulatory()` sets the flag
+unconditionally:
+
+```c
+wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
+wiphy->regulatory_flags |= REGULATORY_ENABLE_RELAX_NO_IR;
+```
+
+There is no LAR test to switch off, so a `lar_disable` parameter would have
+nothing to do. Making these cards behave would mean dropping the flag outright,
+which is a broader change than this patch makes. The diagnosis above still
+explains the symptom; the fix does not apply.
+
+### `iwldvm` — not affected
+
+The older Centrino-era parts. They never claim a self-managed domain at all:
+
+```c
+hw->wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG | ...
+```
+
+`iw reg get` will not print `(self-managed)` for these. If you are on `iwldvm`
+and 5GHz still fails, this guide is not your problem — look at whether the
+adapter advertises AP mode at all (`iw list | grep -A10 'Supported interface
+modes'`), and at the [single-channel restriction](#the-other-restriction-one-channel-at-a-time).
+
+### Non-Intel adapters
 
 This guide is specific to `iwlwifi`. Realtek users should see
 [realtek.md](realtek.md). Adapters from other vendors that report a

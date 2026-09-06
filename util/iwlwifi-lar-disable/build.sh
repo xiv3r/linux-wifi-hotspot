@@ -38,8 +38,31 @@ mok_enrolled() {
        Arch:          pacman -S linux-headers
        Fedora:        dnf install kernel-devel-$KVER"
 
-if ! lsmod | grep -q '^iwlmvm'; then
-    echo "WARN: iwlmvm is not loaded - this patch only applies to Intel iwlwifi adapters" >&2
+# Only iwlmvm gates REGULATORY_WIPHY_SELF_MANAGED behind a LAR test, so it is
+# the only operating-mode module this patch can hook into. Fail early rather
+# than build a module the machine will never use. FORCE=1 to build anyway, e.g.
+# when preparing a module for a different machine.
+# grep -q exits on the first match, which SIGPIPEs the writer; under pipefail
+# that makes a successful match look like a failed pipeline. Read once instead.
+LSMOD=$(lsmod 2>/dev/null || true)
+module_loaded() { grep -q "^$1 " <<<"$LSMOD"; }
+
+if [[ "${FORCE:-0}" != "1" ]]; then
+    if module_loaded iwlmld; then
+        die "this machine uses the iwlmld driver (Wi-Fi 7 parts).
+       iwl_mld_hw_set_regulatory() sets REGULATORY_WIPHY_SELF_MANAGED
+       unconditionally, so there is no LAR test for lar_disable to switch off
+       and this patch cannot help. See docs/howto/intel-5ghz-lar.md."
+    elif module_loaded iwldvm; then
+        die "this machine uses the iwldvm driver (older Centrino parts).
+       Those never claim a self-managed regulatory domain, so the NO_IR problem
+       this patch addresses does not apply. See docs/howto/intel-5ghz-lar.md."
+    elif ! module_loaded iwlmvm; then
+        die "iwlmvm is not loaded - this patch only applies to Intel iwlwifi
+       adapters handled by the mvm operating mode. Check with:
+           lsmod | grep -E '^iwl(dvm|mvm|mld)'
+       Set FORCE=1 to build anyway."
+    fi
 fi
 
 # ---------------------------------------------------------------- kernel source
@@ -64,7 +87,7 @@ else
 
     say "unpacking $IWL_SUBDIR from $TARBALL"
     ( cd "$WORK_DIR" && tar -xf "$TARBALL" --wildcards "*/$IWL_SUBDIR/*" )
-    SRC_ROOT=$(find "$WORK_DIR" -maxdepth 1 -mindepth 1 -type d | head -1)
+    SRC_ROOT=$(find "$WORK_DIR" -maxdepth 1 -mindepth 1 -type d | head -1 || true)
     [[ -d "$SRC_ROOT/$IWL_SUBDIR" ]] || die "unexpected layout in $TARBALL"
 fi
 
@@ -86,7 +109,8 @@ make -C "$BUILD_DIR" M="$SRC_ROOT/$IWL_SUBDIR" modules -j"$(nproc)"
 
 MODULE="$SRC_ROOT/$IWL_SUBDIR/mvm/iwlmvm.ko"
 [[ -f "$MODULE" ]] || die "build produced no $MODULE"
-modinfo "$MODULE" | grep -q 'lar_disable' || die "built module has no lar_disable parameter"
+MODINFO_OUT=$(modinfo "$MODULE" 2>/dev/null || true)
+[[ "$MODINFO_OUT" == *lar_disable* ]] || die "built module has no lar_disable parameter"
 
 $SUDO mkdir -p "$STATE_DIR"
 $SUDO cp "$MODULE" "$STATE_DIR/iwlmvm.ko"

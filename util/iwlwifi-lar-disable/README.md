@@ -9,6 +9,17 @@ flagged `no IR` and cannot host an access point.
 it explains how to tell whether this is actually your problem, and covers the
 Secure Boot key enrollment that the install step depends on.
 
+Only applies to adapters driven by **`iwlmvm`**, which is the sole operating-mode
+module that gates the self-managed regulatory domain behind a LAR test. `iwlmld`
+(Wi-Fi 7) sets the flag unconditionally and `iwldvm` (older Centrino) never sets
+it at all, so neither is helped by this. Check yours with:
+
+```
+lsmod | grep -E '^iwl(dvm|mvm|mld)'
+```
+
+`build.sh` refuses to run on the unsupported ones.
+
 ```
 ./build.sh                    # patch, build and sign against the running kernel
 sudo COUNTRY=XX ./install.sh  # install and enable, XX = your country code
