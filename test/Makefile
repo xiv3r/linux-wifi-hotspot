@@ -1,9 +1,9 @@
 CC=gcc
 PKGCONFIG = $(shell which pkg-config)
 
-CFLAGS=`pkg-config --cflags gtk+-3.0` -I./../src/ui
+CFLAGS += `pkg-config --cflags gtk+-3.0` -I./../src/ui
 
-LIBS=`pkg-config --libs gtk+-3.0 --libs x11` -lstdc++ -lpng -lqrencode
+LDFLAGS += `pkg-config --libs gtk+-3.0 --libs x11` -lstdc++ -lpng -lqrencode
 
 
 ODIR=./../build
