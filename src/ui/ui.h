@@ -72,6 +72,15 @@ static void set_error_text(const char * text);
 
 static void show_shell_error(const char *fallback);
 
+/* Appends a line to the log view. Marshals onto the main loop internally, so
+   it is safe to call from the worker thread that reads create_ap's output. */
+void append_log_line(const char *line);
+
+/* Main loop only. */
+void clear_log(void);
+
+static void expand_log(void);
+
 gchar* get_accepted_macs();
 
 static void set_connected_devices_label(); // new

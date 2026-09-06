@@ -871,6 +871,47 @@
                 <property name="position">2</property>
               </packing>
             </child>
+            <child>
+              <object class="GtkExpander" id="expander_log">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="margin-left">5</property>
+                <property name="margin-right">5</property>
+                <property name="margin-top">2</property>
+                <child>
+                  <object class="GtkScrolledWindow" id="scroll_log">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="min-content-height">160</property>
+                    <property name="shadow-type">in</property>
+                    <child>
+                      <object class="GtkTextView" id="textview_log">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="editable">False</property>
+                        <property name="cursor-visible">False</property>
+                        <property name="monospace">True</property>
+                        <property name="wrap-mode">word-char</property>
+                        <property name="left-margin">4</property>
+                        <property name="right-margin">4</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child type="label">
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Log</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">3</property>
+              </packing>
+            </child>
           </object>
           <packing>
             <property name="expand">False</property>

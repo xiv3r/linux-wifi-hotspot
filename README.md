@@ -7,6 +7,11 @@
 
 
 ### What's new
+* The GUI now shows the full `create_ap` log in a scrollable box instead of just the last line ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
+* 5GHz hotspots now work on Intel adapters - new [guide and helper scripts](docs/howto/intel-5ghz-lar.md) to restore the removed `iwlwifi` `lar_disable` parameter ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
+* The hotspot now follows the channel your WiFi client is on instead of failing with `Failed to set beacon parameters` ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
+* Frequency band selection in the GUI no longer silently falls back to 2.4GHz ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
+* `--ieee80211ac` can now actually reach 80MHz, with the new `--vht-chwidth` option ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
 * Errors from `create_ap` are now shown in the GUI instead of failing silently ([#525](https://github.com/lakinduakash/linux-wifi-hotspot/pull/525))
 * WiFi and Internet interfaces are preselected, so hotspot creation works out of the box ([#525](https://github.com/lakinduakash/linux-wifi-hotspot/pull/525))
 * Virtual interfaces are no longer refused on PCIe/USB `brcmfmac` adapters ([#525](https://github.com/lakinduakash/linux-wifi-hotspot/pull/525))
@@ -50,7 +55,9 @@ If you only need the command line without GUI run `make install-cli-only` as the
 
 ### Notes
 
-- Sometimes there are troubles with **5Ghz bands** due to some vendor restrictions. If you cannot start the hotspot while you are connected to the 5Ghz band, Unselect **Auto** and select **2.4Ghz** in frequency selection.
+- **5Ghz hotspot will not start:** on Intel (`iwlwifi`) adapters this is almost always the adapter's firmware keeping every 5GHz channel flagged `no IR`, which forbids beaconing. See [5GHz hotspots on Intel adapters](docs/howto/intel-5ghz-lar.md) - it explains how to confirm it and includes scripts that fix it. As a quick workaround, unselect **Auto** and select **2.4Ghz** in frequency selection.
+
+- **`Failed to set beacon parameters`:** many adapters can only host an access point on the channel their WiFi client is already using, so the hotspot follows your current connection. Connect to a 2.4GHz network for a 2.4GHz hotspot, or a 5GHz one for 5GHz. See [the same guide](docs/howto/intel-5ghz-lar.md#the-other-restriction-one-channel-at-a-time).
 
 - If any problems with **RealTeK Wifi Adapters** see [this](docs/howto/realtek.md)
 

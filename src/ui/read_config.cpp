@@ -121,7 +121,9 @@ static void setConfigValues(const char * key, char *value){
         configValues.channel = value;
 
     if( !strcmp ( FREQ_BAND, key ))
-        configValues.freq = value;
+        /* the config file stores "default" when no band was requested; the
+           rest of the GUI encodes that as NULL */
+        configValues.freq = strcmp(value, "default") ? value : NULL;
 
     if( !strcmp ( USE_PSK, key ))
         configValues.use_psk = value;

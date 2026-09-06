@@ -1,0 +1,42 @@
+--- a/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h
++++ b/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h
+@@ -85,9 +85,11 @@
+ /**
+  * struct iwl_mvm_mod_params - module parameters for iwlmvm
+  * @power_scheme: one of enum iwl_power_scheme
++ * @lar_disable: disable LAR (Location Aware Regulatory)
+  */
+ struct iwl_mvm_mod_params {
+ 	int power_scheme;
++	bool lar_disable;
+ };
+ extern struct iwl_mvm_mod_params iwlmvm_mod_params;
+ 
+@@ -1436,6 +1438,15 @@
+ 				   IWL_UCODE_TLV_CAPA_LAR_SUPPORT);
+ 
+ 	/*
++	 * With LAR the regulatory domain is owned by the firmware and the wiphy
++	 * becomes self-managed, which leaves every 5GHz channel flagged NO_IR
++	 * while the firmware sits on the world domain. Allow the user to opt
++	 * out so the kernel regulatory database applies instead.
++	 */
++	if (iwlmvm_mod_params.lar_disable)
++		return false;
++
++	/*
+ 	 * Enable LAR only if it is supported by the FW (TLV) &&
+ 	 * enabled in the NVM
+ 	 */
+--- a/drivers/net/wireless/intel/iwlwifi/mvm/ops.c
++++ b/drivers/net/wireless/intel/iwlwifi/mvm/ops.c
+@@ -47,6 +47,9 @@
+ MODULE_PARM_DESC(power_scheme,
+ 		 "power management scheme: 1-active, 2-balanced, 3-low power, default: 2");
+ 
++module_param_named(lar_disable, iwlmvm_mod_params.lar_disable, bool, 0444);
++MODULE_PARM_DESC(lar_disable, "disable LAR (Location Aware Regulatory), default: false");
++
+ /*
+  * module init and exit functions
+  */
