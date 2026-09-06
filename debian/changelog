@@ -1,3 +1,41 @@
+linux-wifi-hotspot (5.0.0) noble; urgency=medium
+
+  * create_ap: follow the station's channel on adapters that only advertise AP
+    mode in a single-channel interface combination, which iwlwifi has done
+    since Linux 6.11. Fixes hotspot creation failing with hostapd's
+    "Failed to set beacon parameters" (GH #435, #472, #344)
+  * create_ap: normalise FREQ_BAND=default so a generated config no longer
+    silently moves the hotspot to 5GHz channel 36
+  * create_ap: stop falling back to an empty channel when the adapter is not
+    associated (GH #206)
+  * create_ap: explain when a self-managed regulatory domain makes 5GHz
+    unusable instead of only reporting the channel as unavailable
+  * create_ap: configure the VHT channel width, so --ieee80211ac can reach
+    80MHz instead of stopping at 40MHz; adds --vht-chwidth
+  * create_ap: derive the HT40 secondary channel direction from the operating
+    channel rather than assuming [HT40+]
+  * create_ap: warn when clients never complete the WPA handshake
+  * create_ap: only refuse virtual interfaces on SDIO brcmfmac adapters
+  * create_ap: prevent --mkconfig from overwriting arbitrary files
+  * create_ap: fix a root file read vulnerability
+  * create_ap: add --dhcp-hosts for static DHCP assignments
+  * create_ap: move the haveged watchdog mutex inside the guarding logic
+  * create_ap: use a portable shebang
+  * gui: show the full create_ap log in a scrollable view instead of only the
+    last line
+  * gui: report create_ap errors instead of failing silently
+  * gui: stop passing "--freq-band default", which pinned the hotspot to
+    2.4GHz regardless of the selected band
+  * gui: preselect the WiFi and Internet interfaces so hotspot creation works
+    out of the box
+  * gui: fix crashes parsing /etc/create_ap.conf (NULL dereference and buffer
+    overflow)
+  * gui: wait for create_ap to exit after AP-ENABLED
+  * gui: tweak the IEEE 802.11n/ac/ax styling and fix build errors
+  * docs: add a guide and helper scripts for 5GHz hotspots on Intel adapters
+
+ -- Lakindu Akash <lakinduakash@gmail.com>  Sun, 06 Sep 2026 14:17:51 +0530
+
 linux-wifi-hotspot (4.7.2) focal; urgency=low
 
 ## What's Changed
