@@ -7,6 +7,7 @@
 
 
 ### What's new
+* The GUI now shows the full `create_ap` log in a scrollable box instead of just the last line ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
 * 5GHz hotspots now work on Intel adapters - new [guide and helper scripts](docs/howto/intel-5ghz-lar.md) to restore the removed `iwlwifi` `lar_disable` parameter ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
 * The hotspot now follows the channel your WiFi client is on instead of failing with `Failed to set beacon parameters` ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
 * Frequency band selection in the GUI no longer silently falls back to 2.4GHz ([#527](https://github.com/lakinduakash/linux-wifi-hotspot/pull/527))
