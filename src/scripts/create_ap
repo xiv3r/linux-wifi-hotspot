@@ -53,6 +53,9 @@ usage() {
     echo "  --ieee80211ax           Enable IEEE 802.11ax (VHT)"
     echo "  --ht_capab <HT>         HT capabilities (default: [HT40+])"
     echo "  --vht_capab <VHT>       VHT capabilities"
+    echo "  --vht-chwidth <MHz>     Channel width to aim for on 5GHz with --ieee80211ac."
+    echo "                          Valid inputs: 20, 40, 80, 160 (default: 80). Capped to"
+    echo "                          what the regulatory domain allows."
     echo "  --country <code>        Set two-letter country code for regularity (example: US)"
     echo "  --freq-band <GHz>       Set frequency band. Valid inputs: 2.4, 5 (default: Use 5GHz if the interface supports it)"
     echo "  --driver                Choose your WiFi adapter driver (default: nl80211)"
@@ -374,6 +377,52 @@ regdomain_hint() {
        not carry an access point. 'iw reg set' does not change this, the value
        comes from the adapter's own firmware. 2.4GHz is unaffected, so run the
        hotspot with --freq-band 2.4."
+}
+
+# Widest channel (MHz) the active regulatory domain permits at a frequency.
+# iw reg get can print both a global and a per-phy section, so take the most
+# restrictive rule that covers the frequency. Prints nothing when unknown.
+get_max_regulatory_bw() {
+    local FREQ=$1
+    iw reg get 2>/dev/null | tr -d '\t' |
+        sed -n 's/^(\([0-9]\+\) - \([0-9]\+\) @ \([0-9]\+\)).*/\1 \2 \3/p' |
+        while read -r LO HI BW; do
+            [[ $FREQ -ge $LO && $FREQ -le $HI ]] && echo "$BW"
+        done | sort -n | head -1
+}
+
+# VHT centre frequency index for the 80 or 160MHz block holding a 5GHz channel.
+get_vht_seg0_idx() {
+    local CH=$1 WIDTH=$2
+    if [[ $WIDTH -eq 80 ]]; then
+        case $CH in
+            36|40|44|48)        echo 42  ;;
+            52|56|60|64)        echo 58  ;;
+            100|104|108|112)    echo 106 ;;
+            116|120|124|128)    echo 122 ;;
+            132|136|140|144)    echo 138 ;;
+            149|153|157|161)    echo 155 ;;
+            165|169|173|177)    echo 171 ;;
+        esac
+    elif [[ $WIDTH -eq 160 ]]; then
+        case $CH in
+            36|40|44|48|52|56|60|64)             echo 50  ;;
+            100|104|108|112|116|120|124|128)     echo 114 ;;
+            149|153|157|161|165|169|173|177)     echo 163 ;;
+        esac
+    fi
+}
+
+# Each 5GHz 40MHz pair has a fixed layout: the lower channel takes its
+# secondary above (HT40+), the upper one below (HT40-). Getting this backwards
+# leaves hostapd on a 20MHz channel.
+get_ht40_direction() {
+    # printf, not echo: a lone "-" is swallowed as an end-of-options marker by
+    # some shells' echo builtins
+    case $1 in
+        36|44|52|60|100|108|116|124|132|140|149|157|165|173) printf '+' ;;
+        40|48|56|64|104|112|120|128|136|144|153|161|169|177) printf '-' ;;
+    esac
 }
 
 can_be_ap() {
@@ -731,6 +780,7 @@ IEEE80211AC=0
 IEEE80211AX=0
 HT_CAPAB='[HT40+]'
 VHT_CAPAB=
+VHT_CHWIDTH=80
 DRIVER=nl80211
 NO_VIRT=0
 COUNTRY=
@@ -747,7 +797,7 @@ HOSTAPD_DEBUG_ARGS=
 REDIRECT_TO_LOCALHOST=0
 
 CONFIG_OPTS=(CHANNEL GATEWAY WPA_VERSION ETC_HOSTS DHCP_DNS NO_DNS NO_DNSMASQ HIDDEN MAC_FILTER MAC_FILTER_ACCEPT ISOLATE_CLIENTS
-             SHARE_METHOD IEEE80211N IEEE80211AC IEEE80211AX HT_CAPAB VHT_CAPAB DRIVER NO_VIRT COUNTRY FREQ_BAND
+             SHARE_METHOD IEEE80211N IEEE80211AC IEEE80211AX HT_CAPAB VHT_CAPAB VHT_CHWIDTH DRIVER NO_VIRT COUNTRY FREQ_BAND
              NEW_MACADDR DAEMONIZE DAEMON_PIDFILE DAEMON_LOGFILE DNS_LOGFILE NO_HAVEGED WIFI_IFACE INTERNET_IFACE
              SSID PASSPHRASE USE_PSK ADDN_HOSTS DHCP_HOSTS)
 
@@ -1174,7 +1224,7 @@ for ((i=0; i<$#; i++)); do
     fi
 done
 
-GETOPT_ARGS=$(getopt -o hc:w:g:de:nm: -l "help","hidden","hostapd-debug:","hostapd-timestamps","redirect-to-localhost","mac-filter","mac-filter-accept:","isolate-clients","ieee80211n","ieee80211ac","ieee80211ax","ht_capab:","vht_capab:","driver:","no-virt","fix-unmanaged","country:","freq-band:","mac:","dhcp-dns:","daemon","pidfile:","logfile:","dns-logfile:","stop:","list","list-running","list-clients:","version","psk","no-haveged","no-dns","no-dnsmasq","mkconfig:","config:","dhcp-hosts:" -n "$PROGNAME" -- "$@")
+GETOPT_ARGS=$(getopt -o hc:w:g:de:nm: -l "help","hidden","hostapd-debug:","hostapd-timestamps","redirect-to-localhost","mac-filter","mac-filter-accept:","isolate-clients","ieee80211n","ieee80211ac","ieee80211ax","ht_capab:","vht_capab:","vht-chwidth:","driver:","no-virt","fix-unmanaged","country:","freq-band:","mac:","dhcp-dns:","daemon","pidfile:","logfile:","dns-logfile:","stop:","list","list-running","list-clients:","version","psk","no-haveged","no-dns","no-dnsmasq","mkconfig:","config:","dhcp-hosts:" -n "$PROGNAME" -- "$@")
 [[ $? -ne 0 ]] && exit 1
 eval set -- "$GETOPT_ARGS"
 
@@ -1264,6 +1314,11 @@ while :; do
         --vht_capab)
             shift
             VHT_CAPAB="$1"
+            shift
+            ;;
+        --vht-chwidth)
+            shift
+            VHT_CHWIDTH="$1"
             shift
             ;;
         --driver)
@@ -1865,6 +1920,39 @@ accept_mac_file=${MAC_FILTER_ACCEPT}
 EOF
 fi
 
+# Work out how wide the channel can actually be. hostapd stays on a 20/40MHz
+# channel unless it is told the VHT operating width and centre frequency index,
+# so "ieee80211ac=1" on its own never gets past 40MHz. Whatever is asked for is
+# capped to what the regulatory domain allows, so an over-wide request degrades
+# instead of leaving hostapd unable to start.
+EFFECTIVE_BW=20
+if [[ $FREQ_BAND == 5 ]] && [[ $IEEE80211N -eq 1 || $IEEE80211AC -eq 1 ]]; then
+    case $VHT_CHWIDTH in
+        20|40|80|160) EFFECTIVE_BW=$VHT_CHWIDTH ;;
+        *) echo "WARN: invalid --vht-chwidth '${VHT_CHWIDTH}', using 80" >&2
+           EFFECTIVE_BW=80 ;;
+    esac
+
+    # 802.11n tops out at 40MHz; 80 and 160 need VHT
+    [[ $IEEE80211AC -eq 0 && $EFFECTIVE_BW -gt 40 ]] && EFFECTIVE_BW=40
+
+    REG_BW=$(get_max_regulatory_bw $((5000 + CHANNEL * 5)))
+    if [[ -n "$REG_BW" && $REG_BW -lt $EFFECTIVE_BW ]]; then
+        echo "Regulatory domain limits channel ${CHANNEL} to ${REG_BW} MHz wide, using that instead of ${EFFECTIVE_BW} MHz"
+        EFFECTIVE_BW=$REG_BW
+    fi
+
+    HT40_DIR=$(get_ht40_direction ${CHANNEL})
+    if [[ $EFFECTIVE_BW -ge 40 && -n "$HT40_DIR" ]]; then
+        HT_CAPAB=${HT_CAPAB//\[HT40+\]/[HT40${HT40_DIR}]}
+        HT_CAPAB=${HT_CAPAB//\[HT40-\]/[HT40${HT40_DIR}]}
+    else
+        # a 40MHz capability on a 20MHz channel makes hostapd refuse to start
+        HT_CAPAB=${HT_CAPAB//\[HT40+\]/}
+        HT_CAPAB=${HT_CAPAB//\[HT40-\]/}
+    fi
+fi
+
 if [[ $IEEE80211N -eq 1 ]]; then
     cat << EOF >> $CONFDIR/hostapd.conf
 ieee80211n=1
@@ -1874,6 +1962,26 @@ fi
 
 if [[ $IEEE80211AC -eq 1 ]]; then
     echo "ieee80211ac=1" >> $CONFDIR/hostapd.conf
+
+    if [[ $FREQ_BAND == 5 ]]; then
+        case $EFFECTIVE_BW in
+            160) VHT_OPER_CHWIDTH=2 ;;
+            80)  VHT_OPER_CHWIDTH=1 ;;
+            *)   VHT_OPER_CHWIDTH=0 ;;
+        esac
+        echo "vht_oper_chwidth=${VHT_OPER_CHWIDTH}" >> $CONFDIR/hostapd.conf
+
+        if [[ $VHT_OPER_CHWIDTH -ne 0 ]]; then
+            VHT_SEG0=$(get_vht_seg0_idx ${CHANNEL} ${EFFECTIVE_BW})
+            if [[ -n "$VHT_SEG0" ]]; then
+                echo "vht_oper_centr_freq_seg0_idx=${VHT_SEG0}" >> $CONFDIR/hostapd.conf
+            else
+                # no known centre index for this channel, stay narrow rather
+                # than emit a width hostapd can not place
+                sed -i 's/^vht_oper_chwidth=.*/vht_oper_chwidth=0/' $CONFDIR/hostapd.conf
+            fi
+        fi
+    fi
 fi
 
 if [[ $IEEE80211AX -eq 1 ]]; then
