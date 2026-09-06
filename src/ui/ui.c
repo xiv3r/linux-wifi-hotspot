@@ -107,6 +107,8 @@ GtkCheckButton *cb_ieee80211ax;
 GtkProgressBar *progress_bar;
 
 GtkLabel *label_status;
+GtkTextView *textview_log;
+GtkExpander *expander_log;
 GtkLabel *label_input_error;
 
 GtkCssProvider* provider;
@@ -169,6 +171,8 @@ static void on_create_hp_clicked(GtkWidget *widget, gpointer data) {
         return;
     }
 
+    clear_log();
+    gtk_label_set_label(label_status, "Starting hotspot...");
     g_thread_new("shell_create_hp", run_create_hp_shell, (void*)build_wh_from_config());
 
 
@@ -215,11 +219,67 @@ static void set_error_text(const char * text){
     gtk_label_set_label(label_input_error,text);
 }
 
+/* create_ap's output is read on a worker thread, and GTK may only be touched
+   from the main loop, so every log update is marshalled through g_idle_add(). */
+static gboolean append_log_line_idle(gpointer data){
+    char *line = data;
+    GtkTextBuffer *tb;
+    GtkTextIter end;
+    GtkTextMark *mark;
+
+    if(textview_log == NULL){
+        g_free(line);
+        return G_SOURCE_REMOVE;
+    }
+
+    tb = gtk_text_view_get_buffer(textview_log);
+    gtk_text_buffer_get_end_iter(tb, &end);
+    gtk_text_buffer_insert(tb, &end, line, -1);
+    gtk_text_buffer_insert(tb, &end, "\n", -1);
+
+    /* keep the newest line in view */
+    gtk_text_buffer_get_end_iter(tb, &end);
+    mark = gtk_text_buffer_create_mark(tb, NULL, &end, FALSE);
+    gtk_text_view_scroll_mark_onscreen(textview_log, mark);
+    gtk_text_buffer_delete_mark(tb, mark);
+
+    g_free(line);
+    return G_SOURCE_REMOVE;
+}
+
+void append_log_line(const char *line){
+    if(line == NULL)
+        return;
+    g_idle_add(append_log_line_idle, g_strdup(line));
+}
+
+/* Called from a GTK signal handler, i.e. already on the main loop. Clearing
+   inline rather than through g_idle_add() also guarantees the reset lands
+   before any line the worker thread queues after it. */
+void clear_log(void){
+    if(textview_log != NULL)
+        gtk_text_buffer_set_text(gtk_text_view_get_buffer(textview_log), "", -1);
+}
+
+static gboolean expand_log_idle(gpointer data){
+    (void) data;
+    if(expander_log != NULL)
+        gtk_expander_set_expanded(expander_log, TRUE);
+    return G_SOURCE_REMOVE;
+}
+
+/* Open the log on failure: the one-line error label rarely carries enough to
+   act on, and the reason is always somewhere in the output. */
+static void expand_log(void){
+    g_idle_add(expand_log_idle, NULL);
+}
+
 /* Show whatever create_ap complained about, falling back to a generic hint
    when it died without a recognisable message. */
 static void show_shell_error(const char *fallback){
     const char *err = get_last_shell_error();
     set_error_text(err != NULL ? err : fallback);
+    expand_log();
 }
 
 static void* entry_mac_warn(GtkWidget *widget, gpointer data){
@@ -465,6 +525,8 @@ int initUi(int argc, char *argv[]){
     rb_freq_5 = (GtkRadioButton *) gtk_builder_get_object(builder, "rb_freq_5");
 
     label_status = (GtkLabel *) gtk_builder_get_object(builder, "label_status");
+    textview_log = (GtkTextView *) gtk_builder_get_object(builder, "textview_log");
+    expander_log = (GtkExpander *) gtk_builder_get_object(builder, "expander_log");
     label_input_error = (GtkLabel *) gtk_builder_get_object(builder, "label_input_error");
 
     progress_bar = (GtkProgressBar *) gtk_builder_get_object(builder, "progress_bar");
@@ -821,7 +883,7 @@ static void *run_create_hp_shell(void *cmd) {
     while (fgets(buf, BUFSIZE, fp) != NULL) {
         buf[strcspn(buf, "\n")] = 0;
         printf("%s\n", buf);
-        gtk_label_set_label(label_status,buf);
+        append_log_line(buf);
         record_shell_error_line(buf);
 
         if (!ap_enabled && strstr(buf, AP_ENABLED) != NULL) {
