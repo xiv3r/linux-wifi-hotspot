@@ -800,7 +800,7 @@ static void *run_create_hp_shell(void *cmd) {
 
     /* create_ap reports every failure on stderr, so fold it into the pipe -
        without it a failed start leaves the user with no reason at all */
-    if(configValues.freq)
+    if(is_explicit_freq_band(configValues.freq))
         snprintf(cmd_line, CMD_BUFSIZE, "{ %s --freq-band %s ; } 2>&1", (char*)cmd, configValues.freq);
     else
         snprintf(cmd_line, CMD_BUFSIZE, "{ %s ; } 2>&1", (char*)cmd);

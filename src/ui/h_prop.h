@@ -52,6 +52,8 @@ static int parse_output(const char *);
 const char *build_wh_start_command(char *, char *, char *, char *);
 const char *build_wh_from_config(void);
 
+int is_explicit_freq_band(const char *);
+
 int startShell(const char *);
 
 int write_config(char *);

@@ -154,13 +154,22 @@ const char *build_wh_start_command(char *iface_src, char *iface_dest, char *ssid
 }
 
 
+/* create_ap only accepts "2.4" and "5" for --freq-band. Anything else - most
+   importantly the "default" that the config file stores when no band was
+   requested - has to be left off the command line entirely, otherwise
+   create_ap treats it as an explicit band request and refuses to follow the
+   channel the adapter is already associated with. */
+int is_explicit_freq_band(const char *freq){
+    return freq != NULL && (strcmp(freq, "2.4") == 0 || strcmp(freq, "5") == 0);
+}
+
 const char *build_wh_mkconfig_command(ConfigValues* cv){
 
     const char* config_ffile_name=get_config_file(CONFIG_FILE_NAME);
 
     snprintf(cmd_mkconfig, BUFSIZE, "%s %s %s %s '%s' '%s' %s %s",SUDO, CREATE_AP, cv->iface_wifi, cv->iface_inet, cv->ssid, cv->pass,MKCONFIG,config_ffile_name);
 
-    if(cv->freq!=NULL){
+    if(is_explicit_freq_band(cv->freq)){
         strcat(cmd_mkconfig," --freq-band ");
         strcat(cmd_mkconfig,cv->freq);
     }
